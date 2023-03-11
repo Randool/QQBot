@@ -1,0 +1,13 @@
+**/.idea
+**/__pycache__
+**/.venv
+
+**/dialog_state
+**/data
+**/example
+
+logs
+.stignore
+session.token
+device.json
+ChatGPT_copilot/config.json
