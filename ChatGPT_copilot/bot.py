@@ -10,7 +10,7 @@ from chatgpt import ChatGPT, DialogManager
 from config import BotConfig
 from utils import cooldown_checker, create_matcher
 
-nonebot.init()
+nonebot.init(host="127.0.0.1", port=8080)
 nonebot.load_from_toml("pyproject.toml")
 
 driver = nonebot.get_driver()
@@ -31,15 +31,17 @@ chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
 _HELP = """帮助：
 - /help：显示帮助文档
-- /checkout <人格:str>：切换不同的人格模板（该操作会重置对话历史）
+- /checkout <人格:str>：切换不同的人格模板（该操作会重置对话历史）。当前人格为：{}
 - /reset：重置对话历史
 - /rollback <n:int>：将当前对话回滚n条
 """
 
 
 @help_matcher.handle()
-async def _show_help(_event: V11_MessageEvent, _state: T_State):
-    await help_matcher.send(_HELP, at_sender=True)
+async def _show_help(event: V11_MessageEvent, state: T_State):
+    user_id = event.get_user_id()
+    current_personality = dialog_manager.show_current_personality(user_id)
+    await help_matcher.send(_HELP.format(current_personality), at_sender=True)
 
 
 @checkout_matcher.handle()
@@ -52,13 +54,17 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
     if re.match(r"/checkout\s+\w+", content):
         personality = content.split()[1]
         if personality not in available_personalities:
-            await rollback_matcher.send(f"人格不在列表中，当前可用人格：{available_personalities}", at_sender=True)
+            current_personality = dialog_manager.show_current_personality(user_id)
+            await rollback_matcher.send(f"人格不在列表中，当前人格：{current_personality}"
+                                        f"可用人格：{available_personalities}", at_sender=True)
         else:
             dialog_manager.init_dialog(user_id, personality)
             await rollback_matcher.send(f"人格：“{personality}”切换成功", at_sender=True)
     else:
+        current_personality = dialog_manager.show_current_personality(user_id)
         await rollback_matcher.send("指令格式错误，应当为“/checkout <人格:str>”。"
-                                    f"当前可用人格：{available_personalities}", at_sender=True)
+                                    f"当前人格：{current_personality}"
+                                    f"可用人格：{available_personalities}", at_sender=True)
 
 
 @refresh_matcher.handle()

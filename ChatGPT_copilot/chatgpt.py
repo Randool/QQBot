@@ -6,11 +6,10 @@
 @Version     :  1.0
 @Description :  None
 """
-import functools
 import glob
 import json
 import os.path
-from typing import List
+from typing import List, Optional
 
 import openai
 import tiktoken
@@ -89,6 +88,17 @@ class DialogManager(dict):
             filename = os.path.join(self.save_dir, f"{user_id}.json")
             if os.path.exists(filename):
                 os.remove(filename)
+
+    def show_current_personality(self, user_id: str) -> Optional[str]:
+        if self[user_id][0]["role"] == "system":
+            prompt = self[user_id][0]["content"]
+
+            for file in glob.glob(os.path.join("./personality", "*.json")):
+                with open(file, encoding="utf8") as f:
+                    if prompt == json.load(f)["content"]:
+                        return os.path.split(file)[-1][:-5]
+
+        return None
 
     @staticmethod
     def show_available_personalities() -> List[str]:
