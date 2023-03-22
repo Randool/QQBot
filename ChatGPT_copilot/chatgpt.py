@@ -43,7 +43,7 @@ class ChatGPT:
 
     @staticmethod
     def interact_chatgpt(
-            message_history: List[dict], model: str = "gpt-3.5-turbo", temperature: float = 0,
+            message_history: List[dict], model: str = "gpt-3.5-turbo", temperature: float = 0, timeout_retry=1,
     ) -> dict:
         """ See: https://platform.openai.com/docs/guides/chat/introduction """
         # [
@@ -52,13 +52,25 @@ class ChatGPT:
         #     {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
         #     {"role": "user", "content": "Where was it played?"}
         # ]
-        response = openai.ChatCompletion.create(
-            model=model,
-            messages=message_history,
-            temperature=temperature,
-        )
-        response_message = dict(response["choices"][0]["message"])
-        return response_message
+        response = None
+
+        while timeout_retry > 0:
+            timeout_retry -= 1
+            try:
+                response = openai.ChatCompletion.create(
+                    model=model,
+                    messages=message_history,
+                    temperature=temperature,
+                )
+                break
+            except openai.error.Timeout:
+                pass
+
+        if response is not None:
+            response_message = dict(response["choices"][0]["message"])
+            return response_message
+        else:
+            return None
 
 
 class DialogManager(dict):

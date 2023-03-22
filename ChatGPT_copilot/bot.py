@@ -107,12 +107,18 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
     dialog_manager.add_content(user_id, "user", content)
 
     response = bot.interact_chatgpt(dialog_manager[user_id])
-    response["content"] = response["content"].strip()
 
-    logger.info(f"[回复]：{response}")
-    dialog_manager.add_content(user_id, **response)
+    if response is None:
+        logger.error("[超时]")
+        dialog_manager.rollback_dialog(user_id, 1)
+        await chat_matcher.send("Error: 回复超时，请重试", at_sender=True)
+    else:
+        response["content"] = response["content"].strip()
 
-    await chat_matcher.send(response["content"], at_sender=True)
+        logger.info(f"[回复]：{response}")
+        dialog_manager.add_content(user_id, **response)
+
+        await chat_matcher.send(response["content"], at_sender=True)
 
 
 if __name__ == "__main__":
