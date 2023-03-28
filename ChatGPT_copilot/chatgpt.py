@@ -43,8 +43,9 @@ class ChatGPT:
 
     @staticmethod
     def interact_chatgpt(
-            message_history: List[dict], model: str = "gpt-3.5-turbo", temperature: float = 0, timeout_retry=1,
-    ) -> dict:
+            message_history: List[dict], model: str = "gpt-3.5-turbo", temperature: float = 0,
+            timeout=20, timeout_retry=1,
+    ) -> Optional[dict]:
         """ See: https://platform.openai.com/docs/guides/chat/introduction """
         # [
         #     {"role": "system", "content": "You are a helpful assistant."},
@@ -61,6 +62,7 @@ class ChatGPT:
                     model=model,
                     messages=message_history,
                     temperature=temperature,
+                    timeout=timeout,
                 )
                 break
             except openai.error.Timeout:
@@ -102,7 +104,7 @@ class DialogManager(dict):
                 os.remove(filename)
 
     def show_current_personality(self, user_id: str) -> Optional[str]:
-        if self[user_id][0]["role"] == "system":
+        if len(self[user_id]) > 0 and self[user_id][0]["role"] == "system":
             prompt = self[user_id][0]["content"]
 
             for file in glob.glob(os.path.join("./personality", "*.json")):
@@ -117,19 +119,29 @@ class DialogManager(dict):
         personality_files = glob.glob(os.path.join("./personality", "*.json"))
         return [os.path.split(file)[-1][:-5] for file in personality_files]
 
-    def init_dialog(self, user_id: str, personality: str = None, prompt: str = None):
-        self[user_id] = []
-
-        if personality is not None and prompt is not None:
-            logger.error("[WARN] `personality`和`prompt`一个就够了！默认使用预定义的`personality`")
+    def checkout_personality(self, user_id: str, personality: str = None, reset: bool = False):
+        """
+        :param user_id:         User ID
+        :param personality:     目标人格，如果为None则创建空列表
+        :param reset:           True则重置对话历史
+        """
+        if user_id not in self:
+            self[user_id] = []
 
         if personality is not None:
             with open(os.path.join("personality", f"{personality}.json")) as f:
                 personality_info: dict = json.load(f)
-                self[user_id].append(personality_info)
 
-        elif prompt is not None:
-            self[user_id].append({"role": "system", "content": prompt})
+            if len(self[user_id]) == 0 or self[user_id][0]["role"] != "system":
+                self[user_id].insert(0, personality_info)
+            else:
+                self[user_id][0] = personality
+
+        if reset and len(self[user_id]) > 0:
+            if self[user_id][0]["role"] != "system":
+                self[user_id] = []
+            else:
+                self[user_id] = self[user_id][:1]
 
         self._dump_state(user_id)
 
@@ -139,7 +151,7 @@ class DialogManager(dict):
             return
 
         if user_id not in self:
-            self.init_dialog(user_id)
+            self.checkout_personality(user_id)
 
         self[user_id].append({"role": role, "content": content})
 

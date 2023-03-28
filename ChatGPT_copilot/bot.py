@@ -25,15 +25,16 @@ dialog_manager = DialogManager(config.dialog_save_dir, config.dialog_max_length)
 # Matchers
 help_matcher = create_matcher(command="help", priority=1)
 checkout_matcher = create_matcher(command="checkout", priority=1)
+replace_matcher = create_matcher(command="replace", priority=1)
 refresh_matcher = create_matcher(command="reset", priority=1)
 rollback_matcher = create_matcher(command="rollback", priority=1)
 chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
 _HELP = """帮助：
 - /help：显示帮助文档
-- /checkout <人格:str>：切换不同的人格模板（该操作会重置对话历史）。当前人格为：{}
+- /checkout 人格 [reset:bool]：切换不同的人格模板，若reset等于true、True或1，则重置对话历史。当前人格为：{}
 - /reset：重置对话历史
-- /rollback <n:int>：将当前对话回滚n条
+- /rollback n：将当前对话回滚n条
 """
 
 
@@ -51,18 +52,20 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
     content = message.extract_plain_text().strip()
     available_personalities = dialog_manager.show_available_personalities()
 
-    if re.match(r"/checkout\s+\w+", content):
-        personality = content.split()[1]
+    if re.match(r"/checkout\s+\w+(\s+\w+)?", content):
+        _cmd, personality, *reset_flag = content.split()
+        reset_flag = bool(eval(reset_flag[0])) if reset_flag else False
+
         if personality not in available_personalities:
             current_personality = dialog_manager.show_current_personality(user_id)
             await rollback_matcher.send(f"人格不在列表中，当前人格：{current_personality}"
                                         f"可用人格：{available_personalities}", at_sender=True)
         else:
-            dialog_manager.init_dialog(user_id, personality)
+            dialog_manager.checkout_personality(user_id, personality, reset_flag)
             await rollback_matcher.send(f"人格：“{personality}”切换成功", at_sender=True)
     else:
         current_personality = dialog_manager.show_current_personality(user_id)
-        await rollback_matcher.send("指令格式错误，应当为“/checkout <人格:str>”。"
+        await rollback_matcher.send("指令格式错误，应当为“/checkout 人格 [reset:bool]。"
                                     f"当前人格：{current_personality}"
                                     f"可用人格：{available_personalities}", at_sender=True)
 
@@ -89,7 +92,7 @@ async def _rollback_matcher(event: V11_MessageEvent, state: T_State):
         logger.info(f"回滚与{user_id}的对话{n}条")
         await rollback_matcher.send("回滚成功", at_sender=True)
     else:
-        await rollback_matcher.send("指令格式错误，应当为“/rollback <n:int>”", at_sender=True)
+        await rollback_matcher.send("指令格式错误，应当为“/rollback n”", at_sender=True)
 
 
 @chat_matcher.handle(parameterless=[cooldown_checker(config.cd_time)])
@@ -102,7 +105,7 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
 
     if user_id not in dialog_manager:
         logger.info(f"[赋予人格]：{config.default_personality}")
-        dialog_manager.init_dialog(user_id, personality=config.default_personality)
+        dialog_manager.checkout_personality(user_id, personality=config.default_personality)
 
     dialog_manager.add_content(user_id, "user", content)
 

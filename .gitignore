@@ -1,6 +1,7 @@
 **/.idea
 **/__pycache__
 **/.venv
+**/venv
 
 **/dialog_state
 **/data
@@ -11,3 +12,5 @@ logs
 session.token
 device.json
 ChatGPT_copilot/config.json
+ChatGPT_copilot/personality/me.json
+
