@@ -25,9 +25,9 @@ dialog_manager = DialogManager(config.dialog_save_dir, config.dialog_max_length)
 # Matchers
 help_matcher = create_matcher(command="help", priority=1)
 checkout_matcher = create_matcher(command="checkout", priority=1)
-replace_matcher = create_matcher(command="replace", priority=1)
 refresh_matcher = create_matcher(command="reset", priority=1)
 rollback_matcher = create_matcher(command="rollback", priority=1)
+status_matcher = create_matcher(command="status", priority=1)
 chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
 _HELP = """帮助：
@@ -35,6 +35,7 @@ _HELP = """帮助：
 - /checkout 人格 [reset:bool]：切换不同的人格模板，若reset等于true、True或1，则重置对话历史。当前人格为：{}
 - /reset：重置对话历史
 - /rollback n：将当前对话回滚n条
+- /status: 显示当前对话状态
 """
 
 
@@ -93,6 +94,13 @@ async def _rollback_matcher(event: V11_MessageEvent, state: T_State):
         await rollback_matcher.send("回滚成功", at_sender=True)
     else:
         await rollback_matcher.send("指令格式错误，应当为“/rollback n”", at_sender=True)
+
+
+@status_matcher.handle()
+async def _status_matcher(event: V11_MessageEvent, state: T_State):
+    user_id = event.get_user_id()
+    content = f"当前人格：{dialog_manager.show_current_personality(user_id)}，对话历史长度：{len(dialog_manager[user_id])}。"
+    await rollback_matcher.send(content, at_sender=True)
 
 
 @chat_matcher.handle(parameterless=[cooldown_checker(config.cd_time)])
