@@ -71,7 +71,13 @@ class ChatGPT:
 
         if response is not None:
             response_message = dict(response["choices"][0]["message"])
-            return response_message
+            try:
+                call_api = json.loads(response_message["content"])
+            except json.JSONDecodeError:  # 常规回复直接返回
+                return response_message
+            else:
+                if "calls" not in call_api:  # 非格式化API调用也直接返回
+                    return response_message
         else:
             return None
 
