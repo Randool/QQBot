@@ -9,6 +9,7 @@
 import glob
 import json
 import os.path
+from collections import defaultdict
 from typing import List, Optional
 
 import openai
@@ -75,11 +76,11 @@ class ChatGPT:
             return None
 
 
-class DialogManager(dict):
+class DialogManager(defaultdict):
     """ user_id ==> [{"role": "", "content": ""}, ...] """
 
     def __init__(self, save_dir: str, dialog_max_length: int = 3000):
-        super().__init__()
+        super().__init__(list)
         self.save_dir = save_dir
         self.dialog_max_length = dialog_max_length
 
@@ -125,9 +126,6 @@ class DialogManager(dict):
         :param personality:     目标人格，如果为None则创建空列表
         :param reset:           True则重置对话历史
         """
-        if user_id not in self:
-            self[user_id] = []
-
         if personality is not None:
             with open(os.path.join("personality", f"{personality}.json")) as f:
                 personality_info: dict = json.load(f)
@@ -135,7 +133,7 @@ class DialogManager(dict):
             if len(self[user_id]) == 0 or self[user_id][0]["role"] != "system":
                 self[user_id].insert(0, personality_info)
             else:
-                self[user_id][0] = personality
+                self[user_id][0] = personality_info
 
         if reset and len(self[user_id]) > 0:
             if self[user_id][0]["role"] != "system":
