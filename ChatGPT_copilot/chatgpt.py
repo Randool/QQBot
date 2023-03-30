@@ -6,15 +6,15 @@
 @Version     :  1.0
 @Description :  None
 """
-import glob
 import json
-import os.path
-from collections import defaultdict
+from dataclasses import dataclass
 from typing import List, Optional
 
 import openai
 import tiktoken
 from nonebot.log import logger
+
+from web_api import query_web_api
 
 
 def num_tokens_from_messages(messages: List[dict], model="gpt-3.5-turbo-0301") -> int:
@@ -38,13 +38,25 @@ def num_tokens_from_messages(messages: List[dict], model="gpt-3.5-turbo-0301") -
   See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
 
 
+@dataclass
+class ChatCompletionArgs:
+    model: str = "gpt-3.5-turbo"
+    temperature: float = 1.0
+    top_p: float = 1.0
+    n: int = 1
+    max_tokens: int = int(1e4)
+
+
+_DEFAULT_ARGS = ChatCompletionArgs()
+
+
 class ChatGPT:
     def __init__(self, api_key: str):
         openai.api_key = api_key
 
     @staticmethod
     def interact_chatgpt(
-            message_history: List[dict], model: str = "gpt-3.5-turbo", temperature: float = 0,
+            messages: List[dict], chat_completion_args: ChatCompletionArgs = _DEFAULT_ARGS,
             timeout=20, timeout_retry=1,
     ) -> Optional[dict]:
         """ See: https://platform.openai.com/docs/guides/chat/introduction """
@@ -56,143 +68,67 @@ class ChatGPT:
         # ]
         response = None
 
-        while timeout_retry > 0:
+        while response is None and timeout_retry > 0:
             timeout_retry -= 1
             try:
                 response = openai.ChatCompletion.create(
-                    model=model,
-                    messages=message_history,
-                    temperature=temperature,
+                    messages=messages,
+                    **vars(chat_completion_args),
                     timeout=timeout,
                 )
                 break
             except openai.error.Timeout:
-                pass
+                logger.error("`openai.error.Timeout`，重新尝试！")
 
         if response is not None:
             response_message = dict(response["choices"][0]["message"])
-            try:
-                call_api = json.loads(response_message["content"])
-            except json.JSONDecodeError:  # 常规回复直接返回
-                return response_message
-            else:
-                if "calls" not in call_api:  # 非格式化API调用也直接返回
-                    return response_message
-        else:
-            return None
-
-
-class DialogManager(defaultdict):
-    """ user_id ==> [{"role": "", "content": ""}, ...] """
-
-    def __init__(self, save_dir: str, dialog_max_length: int = 3000):
-        super().__init__(list)
-        self.save_dir = save_dir
-        self.dialog_max_length = dialog_max_length
-
-        os.makedirs(save_dir, exist_ok=True)
-        self._load_all_state()
-
-    def _load_all_state(self):
-        for file in glob.glob(os.path.join(self.save_dir, "*.json")):
-            user_id = os.path.split(file)[-1][:-5]
-            with open(file, encoding="utf8") as f:
-                self[user_id] = json.load(f)
-            logger.info(f"恢复与{user_id}的{len(self[user_id])}条对话")
-
-    def _dump_state(self, user_id: str):
-        # Easy implement :)
-        if user_id in self:
-            with open(os.path.join(self.save_dir, f"{user_id}.json"), "w", encoding="utf8") as f:
-                json.dump(self[user_id], f, ensure_ascii=False, indent=2)
-        else:
-            filename = os.path.join(self.save_dir, f"{user_id}.json")
-            if os.path.exists(filename):
-                os.remove(filename)
-
-    def show_current_personality(self, user_id: str) -> Optional[str]:
-        if len(self[user_id]) > 0 and self[user_id][0]["role"] == "system":
-            prompt = self[user_id][0]["content"]
-
-            for file in glob.glob(os.path.join("./personality", "*.json")):
-                with open(file, encoding="utf8") as f:
-                    if prompt == json.load(f)["content"]:
-                        return os.path.split(file)[-1][:-5]
+            return response_message
 
         return None
 
     @staticmethod
-    def show_available_personalities() -> List[str]:
-        personality_files = glob.glob(os.path.join("./personality", "*.json"))
-        return [os.path.split(file)[-1][:-5] for file in personality_files]
+    def interact_chatgpt_api(
+            messages: List[dict], chat_completion_args: ChatCompletionArgs = _DEFAULT_ARGS,
+            timeout=20, timeout_retry=1,
+    ):
+        """ 这个插件会更具模型自己的选择多次调用api """
+        response = None
 
-    def checkout_personality(self, user_id: str, personality: str = None, reset: bool = False):
-        """
-        :param user_id:         User ID
-        :param personality:     目标人格，如果为None则创建空列表
-        :param reset:           True则重置对话历史
-        """
-        if personality is not None:
-            with open(os.path.join("personality", f"{personality}.json")) as f:
-                personality_info: dict = json.load(f)
+        while response is None and timeout_retry > 0:
+            timeout_retry -= 1
+            try:
+                response = openai.ChatCompletion.create(
+                    messages=messages,
+                    **vars(chat_completion_args),
+                    timeout=timeout,
+                )
+                break
+            except openai.error.Timeout:
+                logger.error("`openai.error.Timeout`，重新尝试！")
 
-            if len(self[user_id]) == 0 or self[user_id][0]["role"] != "system":
-                self[user_id].insert(0, personality_info)
+        if response is not None:
+            response_message = dict(response["choices"][0]["message"])
+            try:
+                # {"calls": [{"API": "Google", "query": "What other name is Coca-Cola known by?"},{"API": "Google", "query": "Who manufactures Coca-Cola?"}]}
+                APIs: List[dict] = json.loads(response_message["content"])["calls"]
+            except (json.JSONDecodeError, KeyError):  # 常规回复或者是异常结果，则直接返回
+                return response_message
             else:
-                self[user_id][0] = personality_info
+                # TODO: 依次调用API
+                results = []
+                for API in APIs:
+                    try:
+                        api_name = API["API"]
+                        query = API["query"]
+                        results_ = query_web_api(api_name, query)
+                    except KeyError:
+                        logger.warning(f"Incomplete API: {API}")
+                        continue
+                    else:
+                        results.extend(results_)
+                        logger.info(f"[{api_name}] {results_}")
 
-        if reset and len(self[user_id]) > 0:
-            if self[user_id][0]["role"] != "system":
-                self[user_id] = []
-            else:
-                self[user_id] = self[user_id][:1]
+                # TODO: 构造prompt
+                prompt = ""
 
-        self._dump_state(user_id)
-
-    def add_content(self, user_id: str, role: str, content: str):
-        if role not in ("system", "user", "assistant"):
-            logger.error(f"`role`必须为`system`，`user`和`assistant`之一，而不是'{role}'")
-            return
-
-        if user_id not in self:
-            self.checkout_personality(user_id)
-
-        self[user_id].append({"role": role, "content": content})
-
-        # Select and pop the first none-system content.
-        target_role = "system"
-        while num_tokens_from_messages(self[user_id]) >= self.dialog_max_length:
-            idx = 0
-            while idx < len(self[user_id]):
-                if self[user_id][idx]["role"] != target_role:
-                    break
-                idx += 1
-
-            if idx == len(self[user_id]):
-                target_role = "user"
-            else:
-                popped_content = self[user_id].pop(idx)
-                logger.warning(f"Length overflow ==> pop {popped_content}")
-
-        self._dump_state(user_id)
-
-    def delete_dialog(self, user_id: str):
-        del self[user_id]
-        self._dump_state(user_id)
-
-    def reset_dialog(self, user_id: str):
-        if self[user_id][0]["role"] != "system":
-            self[user_id].clear()
-        else:
-            self[user_id] = self[user_id][:1]
-
-        self._dump_state(user_id)
-
-    def rollback_dialog(self, user_id: str, rollback_turns: int):
-        dialog_length = len(self[user_id])
-        if rollback_turns >= dialog_length:
-            self[user_id] = []
-        else:
-            self[user_id] = self[user_id][:(dialog_length - rollback_turns)]
-
-        self._dump_state(user_id)
+        return None

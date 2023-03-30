@@ -6,8 +6,9 @@ from nonebot.adapters.onebot.v11 import MessageEvent as V11_MessageEvent
 from nonebot.log import logger
 from nonebot.typing import T_State
 
-from chatgpt import ChatGPT, DialogManager
+from chatgpt import ChatGPT
 from config import BotConfig
+from dialog_manager import DialogManager
 from utils import cooldown_checker, create_matcher
 
 nonebot.init(host="127.0.0.1", port=8080)
@@ -27,6 +28,7 @@ help_matcher = create_matcher(command="help", priority=1)
 checkout_matcher = create_matcher(command="checkout", priority=1)
 refresh_matcher = create_matcher(command="reset", priority=1)
 rollback_matcher = create_matcher(command="rollback", priority=1)
+length_mathcher = create_matcher(command="length", priority=1)
 status_matcher = create_matcher(command="status", priority=1)
 chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
@@ -35,6 +37,7 @@ _HELP = """帮助：
 - /checkout 人格 [reset:bool]：切换不同的人格模板，若reset等于true、True或1，则重置对话历史。当前人格为：{}
 - /reset：重置对话历史
 - /rollback n：将当前对话回滚n条
+- /length [L:int]：查看或者调整对话长度
 - /status: 显示当前对话状态
 """
 
@@ -96,6 +99,11 @@ async def _rollback_matcher(event: V11_MessageEvent, state: T_State):
         await rollback_matcher.send("指令格式错误，应当为“/rollback n”", at_sender=True)
 
 
+@length_mathcher.handle()
+async def _length_matcher(event: V11_MessageEvent, state: T_State):
+    user_id = event.get_user_id()
+
+
 @status_matcher.handle()
 async def _status_matcher(event: V11_MessageEvent, state: T_State):
     user_id = event.get_user_id()
@@ -112,12 +120,15 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
     # await chat_matcher.send("啊对对对", at_sender=True)
 
     if user_id not in dialog_manager:
-        logger.info(f"[赋予人格]：{config.default_personality}")
         dialog_manager.checkout_personality(user_id, personality=config.default_personality)
 
     dialog_manager.add_content(user_id, "user", content)
 
-    response = bot.interact_chatgpt(dialog_manager[user_id])
+    # Select different functions
+    if (personality := dialog_manager.show_current_personality(user_id)) is not None and personality.endswith("api"):
+        response = bot.interact_chatgpt(dialog_manager[user_id])
+    else:
+        response = bot.interact_chatgpt_api(dialog_manager[user_id])
 
     if response is None:
         logger.error("[超时]")
