@@ -21,6 +21,10 @@ class BotConfig:
     dialog_save_dir: str = field(default="./dialog_state")
     dialog_max_length: int = field(default=3000)
 
+    web_api_secret_keys: dict = field(
+        default_factory=lambda: {"wolfram_appid": "", "google_key": "", "google_cx": ""}
+    )
+
     @classmethod
     def from_config(cls, config_file: str):
         with open(config_file, encoding="utf8") as f:

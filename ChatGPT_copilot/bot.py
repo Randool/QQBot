@@ -117,18 +117,11 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
     message = event.get_message()
     content = message.extract_plain_text().strip()
 
-    # await chat_matcher.send("啊对对对", at_sender=True)
-
     if user_id not in dialog_manager:
         dialog_manager.checkout_personality(user_id, personality=config.default_personality)
 
     dialog_manager.add_content(user_id, "user", content)
-
-    # Select different functions
-    if (personality := dialog_manager.show_current_personality(user_id)) is not None and personality.endswith("api"):
-        response = bot.interact_chatgpt(dialog_manager[user_id])
-    else:
-        response = bot.interact_chatgpt_api(dialog_manager[user_id])
+    response = await bot.interact_chatgpt_pro(dialog_manager[user_id], secret_keys=config.web_api_secret_keys)
 
     if response is None:
         logger.error("[超时]")
@@ -136,10 +129,10 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
         await chat_matcher.send("Error: 回复超时，请重试", at_sender=True)
     else:
         response["content"] = response["content"].strip()
-
         logger.info(f"[回复]：{response}")
-        dialog_manager.add_content(user_id, **response)
-
+        # API-call is vulnerable in multi-turn dialog
+        if (p := dialog_manager.show_current_personality(user_id)) is not None and p.endswith("api"):
+            dialog_manager.reset_dialog(user_id)
         await chat_matcher.send(response["content"], at_sender=True)
 
 

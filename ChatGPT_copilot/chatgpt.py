@@ -44,7 +44,7 @@ class ChatCompletionArgs:
     temperature: float = 1.0
     top_p: float = 1.0
     n: int = 1
-    max_tokens: int = int(1e4)
+    max_tokens: int = int(1e3)
 
 
 _DEFAULT_ARGS = ChatCompletionArgs()
@@ -55,9 +55,24 @@ class ChatGPT:
         openai.api_key = api_key
 
     @staticmethod
-    def interact_chatgpt(
+    def _auto_retry_completion(completion_args: dict, timeout=30, timeout_retry=1):
+        """ `completion_args` should contain at least `message` """
+        response = None
+
+        while response is None and timeout_retry > 0:
+            timeout_retry -= 1
+            try:
+                response = openai.ChatCompletion.create(**completion_args, timeout=timeout)
+                break
+            except openai.error.Timeout:
+                logger.error("`openai.error.Timeout`，重新尝试！")
+
+        return response  # response["choices"][0]["message"]
+
+    @staticmethod
+    async def interact_chatgpt(
             messages: List[dict], chat_completion_args: ChatCompletionArgs = _DEFAULT_ARGS,
-            timeout=20, timeout_retry=1,
+            timeout=30, timeout_retry=1,
     ) -> Optional[dict]:
         """ See: https://platform.openai.com/docs/guides/chat/introduction """
         # [
@@ -66,19 +81,10 @@ class ChatGPT:
         #     {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
         #     {"role": "user", "content": "Where was it played?"}
         # ]
-        response = None
-
-        while response is None and timeout_retry > 0:
-            timeout_retry -= 1
-            try:
-                response = openai.ChatCompletion.create(
-                    messages=messages,
-                    **vars(chat_completion_args),
-                    timeout=timeout,
-                )
-                break
-            except openai.error.Timeout:
-                logger.error("`openai.error.Timeout`，重新尝试！")
+        response = ChatGPT._auto_retry_completion(
+            completion_args={"messages": messages, **vars(chat_completion_args)},
+            timeout=timeout, timeout_retry=timeout_retry,
+        )
 
         if response is not None:
             response_message = dict(response["choices"][0]["message"])
@@ -87,48 +93,67 @@ class ChatGPT:
         return None
 
     @staticmethod
-    def interact_chatgpt_api(
+    async def interact_chatgpt_pro(
             messages: List[dict], chat_completion_args: ChatCompletionArgs = _DEFAULT_ARGS,
-            timeout=20, timeout_retry=1,
+            timeout=20, timeout_retry=2, secret_keys: dict = None,
     ):
-        """ 这个插件会更具模型自己的选择多次调用api """
-        response = None
-
-        while response is None and timeout_retry > 0:
-            timeout_retry -= 1
-            try:
-                response = openai.ChatCompletion.create(
-                    messages=messages,
-                    **vars(chat_completion_args),
-                    timeout=timeout,
-                )
-                break
-            except openai.error.Timeout:
-                logger.error("`openai.error.Timeout`，重新尝试！")
+        """ See: https://platform.openai.com/docs/guides/chat/introduction """
+        # [
+        #     {"role": "system", "content": "You are a helpful assistant."},
+        #     {"role": "user", "content": "Who won the world series in 2020?"},
+        #     {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
+        #     {"role": "user", "content": "Where was it played?"}
+        # ]
+        response = ChatGPT._auto_retry_completion(
+            completion_args={"messages": messages, **vars(chat_completion_args)},
+            timeout=timeout, timeout_retry=timeout_retry,
+        )
 
         if response is not None:
             response_message = dict(response["choices"][0]["message"])
             try:
-                # {"calls": [{"API": "Google", "query": "What other name is Coca-Cola known by?"},{"API": "Google", "query": "Who manufactures Coca-Cola?"}]}
+                # {"calls": [
+                #   {"API": "Google", "query": "What other name is Coca-Cola known by?"},
+                #   {"API": "Google", "query": "Who manufactures Coca-Cola?"}
+                # ]}
                 APIs: List[dict] = json.loads(response_message["content"])["calls"]
-            except (json.JSONDecodeError, KeyError):  # 常规回复或者是异常结果，则直接返回
+            except (json.JSONDecodeError, KeyError):
+                # Normal reply or abnormal result is returned directly
                 return response_message
-            else:
-                # TODO: 依次调用API
-                results = []
-                for API in APIs:
-                    try:
-                        api_name = API["API"]
-                        query = API["query"]
-                        results_ = query_web_api(api_name, query)
-                    except KeyError:
-                        logger.warning(f"Incomplete API: {API}")
-                        continue
-                    else:
-                        results.extend(results_)
-                        logger.info(f"[{api_name}] {results_}")
 
-                # TODO: 构造prompt
-                prompt = ""
+            # Call API sequentially
+            search_results = []
+            secret_keys = {} if secret_keys is None else secret_keys
+
+            for API in APIs:
+                try:
+                    api_name = API["API"]
+                    query = API["query"]
+                    results = query_web_api(api_name, query, **secret_keys)
+                except KeyError:
+                    logger.warning(f"Incomplete API: {API}")
+                    continue
+                else:
+                    search_results.extend(results)
+                    logger.info(f"[{api_name}] {results}")
+
+            # Construct prompt
+            prefix = "Web search results: "
+            suffix = f"Instructions: Using the provided web search results, write a " \
+                     f"comprehensive and summarized reply to the given query. The " \
+                     f"language used should be consistent with the query. The reply " \
+                     f"should let ChatGPT understand easily and fastly."
+            query = messages[-1]["content"]
+            prompt = prefix + str(search_results) + suffix + "Query: " + query
+            logger.info(f"[API prompt] {prompt}")
+
+            response2 = ChatGPT._auto_retry_completion(
+                completion_args={"messages": [{"role": "user", "content": prompt}], **vars(chat_completion_args)},
+                timeout=timeout, timeout_retry=timeout_retry,
+            )
+
+            if response2 is not None:
+                response_message2 = dict(response2["choices"][0]["message"])
+                return response_message2
 
         return None
