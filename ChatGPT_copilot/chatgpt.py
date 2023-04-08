@@ -66,13 +66,15 @@ class ChatGPT:
                 break
             except openai.error.Timeout:
                 logger.error("`openai.error.Timeout`，重新尝试！")
+            except openai.error.RateLimitError as e:
+                logger.error(f"`openai.error.RateLimitError`, {e}")
 
         return response  # response["choices"][0]["message"]
 
     @staticmethod
     async def interact_chatgpt(
             messages: List[dict], chat_completion_args: ChatCompletionArgs = _DEFAULT_ARGS,
-            timeout=30, timeout_retry=1,
+            timeout=20, timeout_retry=2, secret_keys: dict = None,
     ) -> Optional[dict]:
         """ See: https://platform.openai.com/docs/guides/chat/introduction """
         # [
@@ -88,35 +90,13 @@ class ChatGPT:
 
         if response is not None:
             response_message = dict(response["choices"][0]["message"])
-            return response_message
-
-        return None
-
-    @staticmethod
-    async def interact_chatgpt_pro(
-            messages: List[dict], chat_completion_args: ChatCompletionArgs = _DEFAULT_ARGS,
-            timeout=20, timeout_retry=2, secret_keys: dict = None,
-    ):
-        """ See: https://platform.openai.com/docs/guides/chat/introduction """
-        # [
-        #     {"role": "system", "content": "You are a helpful assistant."},
-        #     {"role": "user", "content": "Who won the world series in 2020?"},
-        #     {"role": "assistant", "content": "The Los Angeles Dodgers won the World Series in 2020."},
-        #     {"role": "user", "content": "Where was it played?"}
-        # ]
-        response = ChatGPT._auto_retry_completion(
-            completion_args={"messages": messages, **vars(chat_completion_args)},
-            timeout=timeout, timeout_retry=timeout_retry,
-        )
-
-        if response is not None:
-            response_message = dict(response["choices"][0]["message"])
             try:
-                # {"calls": [
+                # [
                 #   {"API": "Google", "query": "What other name is Coca-Cola known by?"},
                 #   {"API": "Google", "query": "Who manufactures Coca-Cola?"}
-                # ]}
-                APIs: List[dict] = json.loads(response_message["content"])["calls"]
+                # ]
+                APIs: List[dict] = json.loads(response_message["content"])
+                logger.info(f"[API] {APIs}")
             except (json.JSONDecodeError, KeyError):
                 # Normal reply or abnormal result is returned directly
                 return response_message
@@ -157,3 +137,8 @@ class ChatGPT:
                 return response_message2
 
         return None
+
+    @staticmethod
+    async def interact_chatgpt_pro() -> Optional[dict]:
+        # TODO: 实现多次切换prompt的逻辑
+        pass

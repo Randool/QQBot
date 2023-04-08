@@ -28,7 +28,7 @@ help_matcher = create_matcher(command="help", priority=1)
 checkout_matcher = create_matcher(command="checkout", priority=1)
 refresh_matcher = create_matcher(command="reset", priority=1)
 rollback_matcher = create_matcher(command="rollback", priority=1)
-length_mathcher = create_matcher(command="length", priority=1)
+length_matcher = create_matcher(command="length", priority=1)
 status_matcher = create_matcher(command="status", priority=1)
 chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
@@ -99,7 +99,7 @@ async def _rollback_matcher(event: V11_MessageEvent, state: T_State):
         await rollback_matcher.send("指令格式错误，应当为“/rollback n”", at_sender=True)
 
 
-@length_mathcher.handle()
+@length_matcher.handle()
 async def _length_matcher(event: V11_MessageEvent, state: T_State):
     user_id = event.get_user_id()
 
@@ -121,7 +121,7 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
         dialog_manager.checkout_personality(user_id, personality=config.default_personality)
 
     dialog_manager.add_content(user_id, "user", content)
-    response = await bot.interact_chatgpt_pro(dialog_manager[user_id], secret_keys=config.web_api_secret_keys)
+    response = await bot.interact_chatgpt(dialog_manager[user_id], secret_keys=config.web_api_secret_keys)
 
     if response is None:
         logger.error("[超时]")

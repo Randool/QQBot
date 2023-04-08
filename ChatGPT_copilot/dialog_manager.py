@@ -49,17 +49,17 @@ class DialogManager(defaultdict):
         if len(self[user_id]) > 0 and self[user_id][0]["role"] == "system":
             prompt = self[user_id][0]["content"]
 
-            for file in glob.glob(os.path.join("./personality", "*.json")):
+            for file in glob.glob(os.path.join("./personality", "*")):
                 with open(file, encoding="utf8") as f:
-                    if prompt == json.load(f)["content"]:
-                        return os.path.split(file)[-1][:-5]
+                    if prompt == f.read():
+                        return os.path.split(file)[-1]
 
         return None
 
     @staticmethod
     def show_available_personalities() -> List[str]:
-        personality_files = glob.glob(os.path.join("./personality", "*.json"))
-        return [os.path.split(file)[-1][:-5] for file in personality_files]
+        personality_files = glob.glob(os.path.join("./personality", "*"))
+        return [os.path.split(file)[-1] for file in personality_files]
 
     def checkout_personality(self, user_id: str, personality: str = None, reset: bool = False):
         """
@@ -70,8 +70,8 @@ class DialogManager(defaultdict):
         logger.info(f"[user_id: {user_id}] [人格: {personality}] [重置：{reset}]")
 
         if personality is not None:
-            with open(os.path.join("personality", f"{personality}.json")) as f:
-                personality_info: dict = json.load(f)
+            with open(os.path.join("personality", f"{personality}")) as f:
+                personality_info: dict = {"role": "system", "content": f.read()}
 
             if len(self[user_id]) == 0 or self[user_id][0]["role"] != "system":
                 self[user_id].insert(0, personality_info)
