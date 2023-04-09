@@ -19,7 +19,7 @@ class BotConfig:
     api_key: str = field(default=None)
     default_personality: str = field(default="chatgpt")
     dialog_save_dir: str = field(default="./dialog_state")
-    dialog_max_length: int = field(default=3000)
+    dialog_max_length: int = field(default=4000)
 
     web_api_secret_keys: dict = field(
         default_factory=lambda: {"wolfram_appid": "", "google_key": "", "google_cx": ""}

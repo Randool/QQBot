@@ -87,58 +87,82 @@ class ChatGPT:
             completion_args={"messages": messages, **vars(chat_completion_args)},
             timeout=timeout, timeout_retry=timeout_retry,
         )
-
-        if response is not None:
-            response_message = dict(response["choices"][0]["message"])
-            try:
-                # [
-                #   {"API": "Google", "query": "What other name is Coca-Cola known by?"},
-                #   {"API": "Google", "query": "Who manufactures Coca-Cola?"}
-                # ]
-                APIs: List[dict] = json.loads(response_message["content"])
-                logger.info(f"[API] {APIs}")
-            except (json.JSONDecodeError, KeyError):
-                # Normal reply or abnormal result is returned directly
-                return response_message
-
-            # Call API sequentially
-            search_results = []
-            secret_keys = {} if secret_keys is None else secret_keys
-
-            for API in APIs:
-                try:
-                    api_name = API["API"]
-                    query = API["query"]
-                    results = query_web_api(api_name, query, **secret_keys)
-                except KeyError:
-                    logger.warning(f"Incomplete API: {API}")
-                    continue
-                else:
-                    search_results.extend(results)
-                    logger.info(f"[{api_name}] {results}")
-
-            # Construct prompt
-            prefix = "Web search results: "
-            suffix = f"Instructions: Using the provided web search results, write a " \
-                     f"comprehensive and summarized reply to the given query. The " \
-                     f"language used should be consistent with the query. The reply " \
-                     f"should let ChatGPT understand easily and fastly."
-            query = messages[-1]["content"]
-            prompt = prefix + str(search_results) + suffix + "Query: " + query
-            logger.info(f"[API prompt] {prompt}")
-
-            response2 = ChatGPT._auto_retry_completion(
-                completion_args={"messages": [{"role": "user", "content": prompt}], **vars(chat_completion_args)},
-                timeout=timeout, timeout_retry=timeout_retry,
-            )
-
-            if response2 is not None:
-                response_message2 = dict(response2["choices"][0]["message"])
-                return response_message2
-
-        return None
+        response_message = dict(response["choices"][0]["message"])
+        return response_message
 
     @staticmethod
-    async def interact_chatgpt_pro() -> Optional[dict]:
-        # TODO: 实现多次切换prompt的逻辑
-        pass
+    def _summarize_dialog(messages: List[dict]) -> str:
+        """ Converting dialog in dict format into a string. """
+        # TODO: 引入对话历史总结
+        return "\n".join(f"{m['role']}:{m['content']}" for m in messages)
+
+    @staticmethod
+    def _call_plugin_apis(plugin_APIs: List[dict], secret_keys: dict = None) -> List[str]:
+        search_results: List[str] = []
+
+        for API in plugin_APIs:
+            try:
+                plugin_name, query = API["API"], API["query"]
+                results = query_web_api(plugin_name, query, **({} if secret_keys is None else secret_keys))
+            except KeyError:
+                logger.warning(f"Incomplete API: {API}")
+                continue
+            else:
+                search_results.extend(results)
+                logger.info(f"[{plugin_name}] {results}")
+
+        return search_results
+
+    @staticmethod
+    async def interact_chatgpt_with_plugins(
+            messages: List[dict], chat_completion_args: ChatCompletionArgs = _DEFAULT_ARGS,
+            timeout=20, timeout_retry=2, secret_keys: dict = None,
+    ) -> Optional[dict]:
+        """ Enable the large model to access external knowledge and tools. """
+        logger.info("[interact_chatgpt_with_plugins called]")
+
+        ### 0x00: Summarize the dialog
+        summarized_dialog = ChatGPT._summarize_dialog(messages)
+
+        ### 0x01: Generate plugin calls
+        with open("personality/plugin/2_generate_plugin_calls.txt", encoding="utf8") as f:
+            plugin_prompt = f.read()
+            plugin_prompt = plugin_prompt.replace("{{dialog_history}}", summarized_dialog)
+
+        response = ChatGPT._auto_retry_completion(
+            completion_args={"messages": [{"role": "user", "content": plugin_prompt}], **vars(chat_completion_args)},
+            timeout=timeout, timeout_retry=timeout_retry,
+        )
+
+        if response is None:
+            return None
+
+        response_message = dict(response["choices"][0]["message"])
+        try:
+            # [{"API": "Google", "query": "What other name is Coca-Cola known by?"}]
+            APIs: List[dict] = json.loads(response_message["content"])
+            logger.info(f"[API] {APIs}")
+        except (json.JSONDecodeError, KeyError):
+            # Normal reply or abnormal result is returned directly
+            return response_message
+
+        ### 0x02: Call APIs sequentially  TODO: 并发调用API
+        search_results = ChatGPT._call_plugin_apis(APIs, secret_keys)
+
+        ### 0x03. Generate reply based on the dialog history and the results of plugins
+        with open("personality/plugin/3_generate_reply.txt", encoding="utf8") as f:
+            reply_prompt = f.read()
+            reply_prompt = reply_prompt.replace("{{dialog_history}}", summarized_dialog)
+            reply_prompt = reply_prompt.replace("{{knowledge}}", "\n\n".join(search_results))
+
+        response2 = ChatGPT._auto_retry_completion(
+            completion_args={"messages": [{"role": "user", "content": reply_prompt}], **vars(chat_completion_args)},
+            timeout=timeout, timeout_retry=timeout_retry,
+        )
+
+        if response2 is None:
+            return None
+
+        response_message = dict(response2["choices"][0]["message"])
+
+        return response_message

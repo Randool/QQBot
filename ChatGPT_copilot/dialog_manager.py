@@ -18,10 +18,17 @@ from chatgpt import num_tokens_from_messages
 
 
 class DialogManager(defaultdict):
-    """ user_id ==> [{"role": "", "content": ""}, ...] """
+    """
+    {
+        user_id: {
+            "personality": "xxx",
+            "dialog": [{"role": "", "content": ""}, ...]
+        }
+    }
+    """
 
-    def __init__(self, save_dir: str, dialog_max_length: int = 3000):
-        super().__init__(list)
+    def __init__(self, save_dir: str, dialog_max_length: int = 4000):
+        super().__init__(lambda: {"personality": None, "dialog": []})
         self.save_dir = save_dir
         self.dialog_max_length = dialog_max_length
 
@@ -33,7 +40,7 @@ class DialogManager(defaultdict):
             user_id = os.path.split(file)[-1][:-5]
             with open(file, encoding="utf8") as f:
                 self[user_id] = json.load(f)
-            logger.info(f"恢复与{user_id}的{len(self[user_id])}条对话")
+            logger.info(f"恢复与{user_id}的{len(self[user_id]['dialog'])}条对话")
 
     def _dump_state(self, user_id: str):
         # Easy implement :)
@@ -46,15 +53,7 @@ class DialogManager(defaultdict):
                 os.remove(filename)
 
     def show_current_personality(self, user_id: str) -> Optional[str]:
-        if len(self[user_id]) > 0 and self[user_id][0]["role"] == "system":
-            prompt = self[user_id][0]["content"]
-
-            for file in glob.glob(os.path.join("./personality", "*")):
-                with open(file, encoding="utf8") as f:
-                    if prompt == f.read():
-                        return os.path.split(file)[-1]
-
-        return None
+        return self[user_id]["personality"]
 
     @staticmethod
     def show_available_personalities() -> List[str]:
@@ -69,24 +68,34 @@ class DialogManager(defaultdict):
         """
         logger.info(f"[user_id: {user_id}] [人格: {personality}] [重置：{reset}]")
 
+        current_user = self[user_id]
+        current_user_dialog: List[dict] = current_user["dialog"]
+
         if personality is not None:
-            with open(os.path.join("personality", f"{personality}")) as f:
-                personality_info: dict = {"role": "system", "content": f.read()}
+            current_user["personality"] = personality
 
-            if len(self[user_id]) == 0 or self[user_id][0]["role"] != "system":
-                self[user_id].insert(0, personality_info)
+            if (p_file := os.path.join("personality", f"{personality}")) and os.path.isdir(p_file):
+                pass
             else:
-                self[user_id][0] = personality_info
+                with open(p_file, encoding="utf8") as f:
+                    personality_info: dict = {"role": "system", "content": f.read()}
 
-        if reset and len(self[user_id]) > 0:
-            if self[user_id][0]["role"] != "system":
-                self[user_id] = []
+                if len(current_user_dialog) == 0 or current_user_dialog[0]["role"] != "system":
+                    current_user_dialog.insert(0, personality_info)
+                else:
+                    current_user_dialog[0] = personality_info
+
+        if reset and len(current_user_dialog) > 0:
+            if current_user_dialog[0]["role"] != "system":
+                current_user["dialog"] = []
             else:
-                self[user_id] = self[user_id][:1]
+                current_user["dialog"] = current_user_dialog[:1]
 
         self._dump_state(user_id)
 
     def add_content(self, user_id: str, role: str, content: str):
+        current_user = self[user_id]
+
         if role not in ("system", "user", "assistant"):
             logger.error(f"`role`必须为`system`，`user`和`assistant`之一，而不是'{role}'")
             return
@@ -94,21 +103,21 @@ class DialogManager(defaultdict):
         if user_id not in self:
             self.checkout_personality(user_id)
 
-        self[user_id].append({"role": role, "content": content})
+        current_user["dialog"].append({"role": role, "content": content})
 
         # Select and pop the first none-system content.
         target_role = "system"
-        while num_tokens_from_messages(self[user_id]) >= self.dialog_max_length:
+        while num_tokens_from_messages(current_user["dialog"]) >= self.dialog_max_length:
             idx = 0
-            while idx < len(self[user_id]):
-                if self[user_id][idx]["role"] != target_role:
+            while idx < len(current_user["dialog"]):
+                if current_user["dialog"][idx]["role"] != target_role:
                     break
                 idx += 1
 
-            if idx == len(self[user_id]):
+            if idx == len(current_user["dialog"]):
                 target_role = "user"
             else:
-                popped_content = self[user_id].pop(idx)
+                popped_content = current_user["dialog"].pop(idx)
                 logger.warning(f"Length overflow ==> pop {popped_content}")
 
         self._dump_state(user_id)
@@ -118,18 +127,22 @@ class DialogManager(defaultdict):
         self._dump_state(user_id)
 
     def reset_dialog(self, user_id: str):
-        if self[user_id][0]["role"] != "system":
-            self[user_id].clear()
+        current_user = self[user_id]
+
+        if current_user["dialog"][0]["role"] != "system":
+            current_user["dialog"].clear()
         else:
-            self[user_id] = self[user_id][:1]
+            self[user_id]["dialog"] = current_user["dialog"][:1]
 
         self._dump_state(user_id)
 
     def rollback_dialog(self, user_id: str, rollback_turns: int):
-        dialog_length = len(self[user_id])
+        current_user = self[user_id]
+
+        dialog_length = len(current_user["dialog"])
         if rollback_turns >= dialog_length:
-            self[user_id] = []
+            current_user["dialog"] = []
         else:
-            self[user_id] = self[user_id][:(dialog_length - rollback_turns)]
+            current_user["dialog"] = current_user["dialog"][:(dialog_length - rollback_turns)]
 
         self._dump_state(user_id)

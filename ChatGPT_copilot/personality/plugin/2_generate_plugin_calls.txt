@@ -1,0 +1,14 @@
+Dialog history:
+"""
+{{dialog_history}}
+"""
+
+Instructions: Create a list of API calls in the format `{"API":"{API}", "query":"{query}"}` for WikiSearch, Calculator, or Google API based on the previous dialog history. For WikiSearch, use a precise concept word, and for Calculator, use mathematical problems. For Google API, use complete questions in the same language as the query. Sort the output JSON by query relevance and importance, with the most relevant at the top.
+
+Examples:
+Input: Coca-Cola, or Coke, is a carbonated soft drink manufactured by the Coca-Cola Company.
+Output: [{"API":"Google","query":"What other name is Coca-Cola known by?"},{"API":"Google","query":"Who manufactures Coca-Cola?"}]
+Input: Out of 1400 participants, 400 passed the test.
+Output: [{"API":"Calculator","query":"400 / 1400"}]
+Input: 电视剧狂飙怎么样, 和三体比应该看哪一部?
+Output: [{"API":"Google","query":"三体和狂飙谁更好?"},{"API":"Google","query":"电视剧狂飙评分"},{"API":"Google","query":"电视剧三体评分"},{"API":"Google","query":"电视剧狂飙"}]

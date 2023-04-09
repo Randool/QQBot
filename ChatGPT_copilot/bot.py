@@ -28,7 +28,7 @@ help_matcher = create_matcher(command="help", priority=1)
 checkout_matcher = create_matcher(command="checkout", priority=1)
 refresh_matcher = create_matcher(command="reset", priority=1)
 rollback_matcher = create_matcher(command="rollback", priority=1)
-length_matcher = create_matcher(command="length", priority=1)
+# length_matcher = create_matcher(command="length", priority=1)
 status_matcher = create_matcher(command="status", priority=1)
 chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
@@ -62,7 +62,7 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
 
         if personality not in available_personalities:
             current_personality = dialog_manager.show_current_personality(user_id)
-            await rollback_matcher.send(f"人格不在列表中，当前人格：{current_personality}"
+            await rollback_matcher.send(f"人格不在列表中，当前人格：{current_personality}。"
                                         f"可用人格：{available_personalities}", at_sender=True)
         else:
             dialog_manager.checkout_personality(user_id, personality, reset_flag)
@@ -70,7 +70,7 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
     else:
         current_personality = dialog_manager.show_current_personality(user_id)
         await rollback_matcher.send("指令格式错误，应当为“/checkout 人格 [reset:bool]。"
-                                    f"当前人格：{current_personality}"
+                                    f"当前人格：{current_personality}。"
                                     f"可用人格：{available_personalities}", at_sender=True)
 
 
@@ -99,9 +99,9 @@ async def _rollback_matcher(event: V11_MessageEvent, state: T_State):
         await rollback_matcher.send("指令格式错误，应当为“/rollback n”", at_sender=True)
 
 
-@length_matcher.handle()
-async def _length_matcher(event: V11_MessageEvent, state: T_State):
-    user_id = event.get_user_id()
+# @length_matcher.handle()
+# async def _length_matcher(event: V11_MessageEvent, state: T_State):
+#     user_id = event.get_user_id()
 
 
 @status_matcher.handle()
@@ -121,7 +121,13 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
         dialog_manager.checkout_personality(user_id, personality=config.default_personality)
 
     dialog_manager.add_content(user_id, "user", content)
-    response = await bot.interact_chatgpt(dialog_manager[user_id], secret_keys=config.web_api_secret_keys)
+
+    if dialog_manager.show_current_personality(user_id) != "plugin":
+        response = await bot.interact_chatgpt(dialog_manager[user_id]["dialog"],
+                                              secret_keys=config.web_api_secret_keys)
+    else:
+        response = await bot.interact_chatgpt_with_plugins(dialog_manager[user_id]["dialog"],
+                                                           secret_keys=config.web_api_secret_keys)
 
     if response is None:
         logger.error("[超时]")
@@ -130,9 +136,6 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
     else:
         response["content"] = response["content"].strip()
         logger.info(f"[回复]：{response}")
-        # API-call is vulnerable in multi-turn dialog
-        if (p := dialog_manager.show_current_personality(user_id)) is not None and p.endswith("api"):
-            dialog_manager.reset_dialog(user_id)
         await chat_matcher.send(response["content"], at_sender=True)
 
 

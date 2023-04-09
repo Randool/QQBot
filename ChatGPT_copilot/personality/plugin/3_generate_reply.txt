@@ -1,0 +1,11 @@
+Dialog history:
+"""
+{{dialog_history}}
+"""
+
+Knowledge:
+"""
+{{knowledge}}
+"""
+
+Instructions: Generate responses based on previous dialog history and external knowledge
