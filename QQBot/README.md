@@ -1,4 +1,4 @@
-# ChatGPT_copilot
+# QQBot
 
 ## How to start
 

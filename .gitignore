@@ -12,6 +12,6 @@ logs
 .stignore
 session.token
 device.json
-ChatGPT_copilot/config.json
-ChatGPT_copilot/personality/me
+QQBot/config.json
+QQBot/personality/me
 
