@@ -31,6 +31,9 @@ class WikiSearchAPI(MetaAPI):
         call_url = WikiSearchAPI.base_url + urllib.parse.urlencode(params)
         r = requests.get(call_url)
 
+        if r.status_code != 200:
+            return []
+
         data = r.json()['query']['search']
         data = [d['title'] + ": " + remove_html_tags(d["snippet"]) for d in data][:num_results]
         # print()

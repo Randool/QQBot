@@ -21,14 +21,17 @@ config = BotConfig.from_config("config.json")
 
 # ChatGPT & Dialog manager
 bot = ChatGPT(config.api_key)
-dialog_manager = DialogManager(config.dialog_save_dir, config.dialog_max_length)
+dialog_manager = DialogManager(
+    config.dialog_save_dir,
+    dialog_max_length=config.dialog_max_length,
+    default_personality=config.default_personality,
+)
 
 # Matchers
 help_matcher = create_matcher(command="help", priority=1)
 checkout_matcher = create_matcher(command="checkout", priority=1)
 refresh_matcher = create_matcher(command="reset", priority=1)
 rollback_matcher = create_matcher(command="rollback", priority=1)
-# length_matcher = create_matcher(command="length", priority=1)
 status_matcher = create_matcher(command="status", priority=1)
 chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
@@ -37,7 +40,6 @@ _HELP = """帮助：
 - /checkout 人格 [reset:bool]：切换不同的人格模板，若reset等于true、True或1，则重置对话历史。当前人格为：{}
 - /reset：重置对话历史
 - /rollback n：将当前对话回滚n条
-- /length [L:int]：查看或者调整对话长度
 - /status: 显示当前对话状态
 """
 
@@ -99,15 +101,11 @@ async def _rollback_matcher(event: V11_MessageEvent, state: T_State):
         await rollback_matcher.send("指令格式错误，应当为“/rollback n”", at_sender=True)
 
 
-# @length_matcher.handle()
-# async def _length_matcher(event: V11_MessageEvent, state: T_State):
-#     user_id = event.get_user_id()
-
-
 @status_matcher.handle()
 async def _status_matcher(event: V11_MessageEvent, state: T_State):
     user_id = event.get_user_id()
-    content = f"当前人格：{dialog_manager.show_current_personality(user_id)}，对话历史长度：{len(dialog_manager[user_id])}。"
+    content = f"当前人格：{dialog_manager.show_current_personality(user_id)}，" \
+              f"对话历史长度：{len(dialog_manager[user_id]['dialog'])}。"
     await rollback_matcher.send(content, at_sender=True)
 
 
@@ -136,6 +134,7 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
     else:
         response["content"] = response["content"].strip()
         logger.info(f"[回复]：{response}")
+        dialog_manager.add_content(user_id, **response)
         await chat_matcher.send(response["content"], at_sender=True)
 
 

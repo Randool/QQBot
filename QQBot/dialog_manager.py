@@ -27,8 +27,8 @@ class DialogManager(defaultdict):
     }
     """
 
-    def __init__(self, save_dir: str, dialog_max_length: int = 4000):
-        super().__init__(lambda: {"personality": None, "dialog": []})
+    def __init__(self, save_dir: str, dialog_max_length: int = 4000, default_personality: str = "chatgpt"):
+        super().__init__(lambda: {"personality": default_personality, "dialog": []})
         self.save_dir = save_dir
         self.dialog_max_length = dialog_max_length
 
@@ -53,7 +53,9 @@ class DialogManager(defaultdict):
                 os.remove(filename)
 
     def show_current_personality(self, user_id: str) -> Optional[str]:
-        return self[user_id]["personality"]
+        personality = self[user_id]["personality"]
+        self._dump_state(user_id)
+        return personality
 
     @staticmethod
     def show_available_personalities() -> List[str]:

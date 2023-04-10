@@ -3,9 +3,9 @@ Dialog history:
 {{dialog_history}}
 """
 
-Knowledge:
+External Knowledge:
 """
 {{knowledge}}
 """
 
-Instructions: Generate responses based on previous dialog history and external knowledge
+Instructions: Give a concise but understandable response, based on the dialog history and external knowledge.

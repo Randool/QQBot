@@ -7,6 +7,7 @@
 @Description :  None
 """
 import json
+import re
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -140,9 +141,11 @@ class ChatGPT:
         response_message = dict(response["choices"][0]["message"])
         try:
             # [{"API": "Google", "query": "What other name is Coca-Cola known by?"}]
-            APIs: List[dict] = json.loads(response_message["content"])
+            APIs_str = response_message["content"]
+            APIs_str = re.search(r"\[.*]", APIs_str).group()
+            APIs: List[dict] = json.loads(APIs_str)
             logger.info(f"[API] {APIs}")
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError, AttributeError):
             # Normal reply or abnormal result is returned directly
             return response_message
 
