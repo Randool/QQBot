@@ -56,19 +56,26 @@ class ChatGPT:
         openai.api_key = api_key
 
     @staticmethod
-    def _auto_retry_completion(completion_args: dict, timeout=30, timeout_retry=1):
+    def _auto_retry_completion(completion_args: dict, timeout=30, timeout_retry=1) -> Optional[List[dict]]:
         """ `completion_args` should contain at least `message` """
         response = None
 
         while response is None and timeout_retry > 0:
             timeout_retry -= 1
             try:
-                response = openai.ChatCompletion.create(**completion_args, timeout=timeout)
+                raw_response = openai.ChatCompletion.create(**completion_args, timeout=timeout)
+                response = [r["message"] for r in raw_response["choices"]]
                 break
+
             except openai.error.Timeout:
-                logger.error("`openai.error.Timeout`，重新尝试！")
+                error_info = "[Timeout]，重新尝试！"
+                response = [{"role": "assistant", "content": error_info}]
+                logger.error(error_info)
+
             except openai.error.RateLimitError as e:
-                logger.error(f"`openai.error.RateLimitError`, {e}")
+                error_info = f"[RateLimitError], {e}"
+                response = [{"role": "assistant", "content": error_info}]
+                logger.error(response)
 
         return response  # response["choices"][0]["message"]
 
@@ -88,8 +95,7 @@ class ChatGPT:
             completion_args={"messages": messages, **vars(chat_completion_args)},
             timeout=timeout, timeout_retry=timeout_retry,
         )
-        response_message = dict(response["choices"][0]["message"])
-        return response_message
+        return response[0] if response else None
 
     @staticmethod
     def _summarize_dialog(messages: List[dict]) -> str:
@@ -101,6 +107,7 @@ class ChatGPT:
     def _call_plugin_apis(plugin_APIs: List[dict], secret_keys: dict = None) -> List[str]:
         search_results: List[str] = []
 
+        # TODO: 并发调用API
         for API in plugin_APIs:
             try:
                 plugin_name, query = API["API"], API["query"]
@@ -138,7 +145,7 @@ class ChatGPT:
         if response is None:
             return None
 
-        response_message = dict(response["choices"][0]["message"])
+        response_message = dict(response[0])
         try:
             # [{"API": "Google", "query": "What other name is Coca-Cola known by?"}]
             APIs_str = response_message["content"]
@@ -149,7 +156,7 @@ class ChatGPT:
             # Normal reply or abnormal result is returned directly
             return response_message
 
-        ### 0x02: Call APIs sequentially  TODO: 并发调用API
+        ### 0x02: Call APIs sequentially
         search_results = ChatGPT._call_plugin_apis(APIs, secret_keys)
 
         ### 0x03. Generate reply based on the dialog history and the results of plugins
@@ -166,6 +173,6 @@ class ChatGPT:
         if response2 is None:
             return None
 
-        response_message = dict(response2["choices"][0]["message"])
+        response_message = dict(response2[0])
 
         return response_message
