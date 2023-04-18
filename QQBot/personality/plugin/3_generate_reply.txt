@@ -8,4 +8,7 @@ External Knowledge:
 {{knowledge}}
 """
 
-Instructions: Give a concise but understandable response, based on the dialog history and external knowledge.
+Instructions:
+Give a concise but understandable response, based on the dialog history and external knowledge.
+If no outside knowledge is present, inform the user of the lack of relevant knowledge and then offer your assumption.
+Your response language MUST match that of the user.

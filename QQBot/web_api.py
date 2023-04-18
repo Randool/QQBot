@@ -40,8 +40,8 @@ class WikiSearchAPI(MetaAPI):
         return data
 
 
-class GoogleSearchAPI(MetaAPI):
-    api_name = 'GoogleSearch'
+class GoogleAPI(MetaAPI):
+    api_name = 'Google'
     base_url = 'https://customsearch.googleapis.com/customsearch/v1?'
 
     @staticmethod
@@ -54,8 +54,8 @@ class GoogleSearchAPI(MetaAPI):
             'num': num_results
         }
 
-        # call_url = GoogleSearchAPI.base_url + urllib.parse.urlencode(params)
-        r = requests.get(GoogleSearchAPI.base_url, params=params)
+        # call_url = GoogleAPI.base_url + urllib.parse.urlencode(params)
+        r = requests.get(GoogleAPI.base_url, params=params)
         if "items" in r.json():
             items = r.json()["items"]
             filter_data = [
@@ -87,7 +87,7 @@ class WolframAPI(MetaAPI):
         return results
 
 
-_APIs = [WikiSearchAPI, GoogleSearchAPI, WolframAPI]
+_APIs = [WikiSearchAPI, GoogleAPI, WolframAPI]
 REGISTERED_API = {_api.api_name: _api for _api in _APIs}
 
 

@@ -77,7 +77,9 @@ class DialogManager(defaultdict):
             current_user["personality"] = personality
 
             if (p_file := os.path.join("personality", f"{personality}")) and os.path.isdir(p_file):
-                pass
+                # Plugin personality will clear current system prompt
+                if len(current_user_dialog) > 0 and current_user_dialog[0]["role"] == "system":
+                    current_user["dialog"] = []
             else:
                 with open(p_file, encoding="utf8") as f:
                     personality_info: dict = {"role": "system", "content": f.read()}

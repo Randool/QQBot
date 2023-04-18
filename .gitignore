@@ -14,4 +14,4 @@ session.token
 device.json
 QQBot/config.json
 QQBot/personality/me
-
+QQBot/bot.log

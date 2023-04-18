@@ -148,7 +148,7 @@ class ChatGPT:
         response_message = dict(response[0])
         try:
             # [{"API": "Google", "query": "What other name is Coca-Cola known by?"}]
-            APIs_str = response_message["content"]
+            APIs_str = response_message["content"].strip()
             APIs_str = re.search(r"\[.*]", APIs_str).group()
             APIs: List[dict] = json.loads(APIs_str)
             logger.info(f"[API] {APIs}")
