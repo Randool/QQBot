@@ -39,7 +39,7 @@ chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
 _HELP = """帮助：
 - /help：显示帮助文档
-- /checkout 人格 [reset:bool]：切换不同的人格模板，若reset等于true、True或1，则重置对话历史。当前人格为：{}
+- /checkout 人格：切换不同的人格模板（注意此操作将重置对话历史）。当前人格为：{}
 - /reset：重置对话历史
 - /rollback n：将当前对话回滚n条
 - /status: 显示当前对话状态
@@ -60,16 +60,15 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
     content = message.extract_plain_text().strip()
     available_personalities = dialog_manager.show_available_personalities()
 
-    if re.match(r"/checkout\s+\w+(\s+\w+)?", content):
-        _cmd, personality, *reset_flag = content.split()
-        reset_flag = bool(eval(reset_flag[0])) if reset_flag else False
+    if re.match(r"/checkout\s+\w+", content):
+        _cmd, personality = content.split()
 
         if personality not in available_personalities:
             current_personality = dialog_manager.show_current_personality(user_id)
             await rollback_matcher.send(f"人格不在列表中，当前人格：{current_personality}。"
                                         f"可用人格：{available_personalities}", at_sender=True)
         else:
-            dialog_manager.checkout_personality(user_id, personality, reset_flag)
+            dialog_manager.checkout_personality(user_id, personality)
             await rollback_matcher.send(f"人格：“{personality}”切换成功", at_sender=True)
     else:
         current_personality = dialog_manager.show_current_personality(user_id)

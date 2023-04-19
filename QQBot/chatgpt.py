@@ -73,7 +73,13 @@ class ChatGPT:
                 logger.error(error_info)
 
             except openai.error.RateLimitError as e:
-                error_info = f"[RateLimitError], {e}"
+                detail_e = re.sub(r"organization org-.*\s", "organization", str(e))
+                error_info = f"[RateLimitError], {detail_e}"
+                response = [{"role": "assistant", "content": error_info}]
+                logger.error(response)
+
+            except openai.error.InvalidRequestError as e:
+                error_info = f"[InvalidRequestError], {e}"
                 response = [{"role": "assistant", "content": error_info}]
                 logger.error(response)
 
@@ -163,7 +169,7 @@ class ChatGPT:
         with open("personality/plugin/3_generate_reply.txt", encoding="utf8") as f:
             reply_prompt = f.read()
             reply_prompt = reply_prompt.replace("{{dialog_history}}", summarized_dialog)
-            reply_prompt = reply_prompt.replace("{{knowledge}}", "\n\n".join(search_results))
+            reply_prompt = reply_prompt.replace("{{knowledge}}", "\n".join(search_results))
 
         response2 = ChatGPT._auto_retry_completion(
             completion_args={"messages": [{"role": "user", "content": reply_prompt}], **vars(chat_completion_args)},

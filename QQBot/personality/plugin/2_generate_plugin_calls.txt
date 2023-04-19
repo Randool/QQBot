@@ -1,7 +1,7 @@
 Instructions:
-Create a list of API calls in the format `{"API":"{API}", "query":"{query}"}` for WikiSearch, Calculator, or Google API based on the previous dialog history.
+Create a list of API calls in the format `{"API":"{API}", "query":"{query}"}` for WikiSearch, Wolfram, or Google API based on the previous dialog history.
 For WikiSearch, use a precise concept word.
-For Calculator, use mathematical problems.
+For Wolfram, use mathematical problems.
 For Google API, use complete questions in the same language as the query.
 Sort the output JSON by query relevance and importance, with the most relevant at the top.
 
@@ -14,7 +14,7 @@ user: 电视剧狂飙怎么样, 和三体比应该看哪一部?
 user: Of the 1,400 participants, 400 passed the test, so how many people didn't pass?
 assistant: 1,400 - 400 = 1000
 user: And what percentage passed?
-2. Output: [{"API":"Calculator","query":"400 / 1400"}]
+2. Output: [{"API":"Wolfram","query":"400 / 1400"}]
 ###
 3. History:
 {{dialog_history}}

@@ -62,38 +62,29 @@ class DialogManager(defaultdict):
         personality_files = glob.glob(os.path.join("./personality", "*"))
         return [os.path.split(file)[-1] for file in personality_files]
 
-    def checkout_personality(self, user_id: str, personality: str = None, reset: bool = False):
+    def checkout_personality(self, user_id: str, personality: str = None):
         """
         :param user_id:         User ID
         :param personality:     目标人格，如果为None则创建空列表
         :param reset:           True则重置对话历史
         """
-        logger.info(f"[user_id: {user_id}] [人格: {personality}] [重置：{reset}]")
+        logger.info(f"[user_id: {user_id}] [人格: {personality}]")
 
         current_user = self[user_id]
         current_user_dialog: List[dict] = current_user["dialog"]
 
-        if personality is not None:
+        if personality is not None and personality != current_user["personality"]:
             current_user["personality"] = personality
+            current_user["dialog"] = []
 
             if (p_file := os.path.join("personality", f"{personality}")) and os.path.isdir(p_file):
                 # Plugin personality will clear current system prompt
-                if len(current_user_dialog) > 0 and current_user_dialog[0]["role"] == "system":
-                    current_user["dialog"] = []
+                current_user["dialog"] = []
             else:
                 with open(p_file, encoding="utf8") as f:
                     personality_info: dict = {"role": "system", "content": f.read()}
 
-                if len(current_user_dialog) == 0 or current_user_dialog[0]["role"] != "system":
-                    current_user_dialog.insert(0, personality_info)
-                else:
-                    current_user_dialog[0] = personality_info
-
-        if reset and len(current_user_dialog) > 0:
-            if current_user_dialog[0]["role"] != "system":
-                current_user["dialog"] = []
-            else:
-                current_user["dialog"] = current_user_dialog[:1]
+                current_user_dialog.insert(0, personality_info)
 
         self._dump_state(user_id)
 

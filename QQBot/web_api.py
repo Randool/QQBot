@@ -75,13 +75,14 @@ class WolframAPI(MetaAPI):
     def call(query: str, wolfram_appid: str, num_results: int = 5, **kwargs) -> List[str]:
         client = wolframalpha.Client(app_id=wolfram_appid)
         response = client.query(query)
+        print(response)
         results = []
 
         if response["@success"]:
             for i, pod in enumerate(response.pods):
                 if i == num_results:
                     break
-                text = '\n'.join(pod.texts)
+                text = '\n'.join(filter(lambda x: x is not None, pod.texts))
                 results.append(f"{pod.id}: {text}")
 
         return results
