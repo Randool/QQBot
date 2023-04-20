@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 @dataclass
 class BotConfig:
     dialog_command: str = field(default="")
-    cd_time: int = field(default=1)
+    cd_time: int = field(default=3)
     response_image: bool = field(default=False)
 
     api_key: str = field(default=None)
