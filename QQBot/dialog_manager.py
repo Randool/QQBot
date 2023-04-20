@@ -66,25 +66,21 @@ class DialogManager(defaultdict):
         """
         :param user_id:         User ID
         :param personality:     目标人格，如果为None则创建空列表
-        :param reset:           True则重置对话历史
         """
         logger.info(f"[user_id: {user_id}] [人格: {personality}]")
 
         current_user = self[user_id]
-        current_user_dialog: List[dict] = current_user["dialog"]
 
-        if personality is not None and personality != current_user["personality"]:
+        if personality is not None:
             current_user["personality"] = personality
             current_user["dialog"] = []
 
-            if (p_file := os.path.join("personality", f"{personality}")) and os.path.isdir(p_file):
+            if (p_file := os.path.join("personality", f"{personality}")) and not os.path.isdir(p_file):
                 # Plugin personality will clear current system prompt
-                current_user["dialog"] = []
-            else:
                 with open(p_file, encoding="utf8") as f:
                     personality_info: dict = {"role": "system", "content": f.read()}
 
-                current_user_dialog.insert(0, personality_info)
+                current_user["dialog"].insert(0, personality_info)
 
         self._dump_state(user_id)
 
@@ -123,11 +119,13 @@ class DialogManager(defaultdict):
 
     def reset_dialog(self, user_id: str):
         current_user = self[user_id]
+        current_user_dialog: List[dict] = current_user["dialog"]
 
-        if current_user["dialog"][0]["role"] != "system":
-            current_user["dialog"].clear()
-        else:
-            self[user_id]["dialog"] = current_user["dialog"][:1]
+        if len(current_user_dialog) > 0:
+            if current_user_dialog[0]["role"] == "system":
+                current_user["dialog"] = current_user["dialog"][:1]
+            else:
+                current_user_dialog.clear()
 
         self._dump_state(user_id)
 

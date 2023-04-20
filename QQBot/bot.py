@@ -60,7 +60,7 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
     content = message.extract_plain_text().strip()
     available_personalities = dialog_manager.show_available_personalities()
 
-    if re.match(r"/checkout\s+\w+", content):
+    if re.match(r"^\s*/checkout\s+\w+\s*$", content):
         _cmd, personality = content.split()
 
         if personality not in available_personalities:
@@ -72,7 +72,7 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
             await rollback_matcher.send(f"人格：“{personality}”切换成功", at_sender=True)
     else:
         current_personality = dialog_manager.show_current_personality(user_id)
-        await rollback_matcher.send("指令格式错误，应当为“/checkout 人格 [reset:bool]。"
+        await rollback_matcher.send("指令格式错误，应当为“/checkout 人格。"
                                     f"当前人格：{current_personality}。"
                                     f"可用人格：{available_personalities}", at_sender=True)
 
@@ -93,7 +93,7 @@ async def _rollback_matcher(event: V11_MessageEvent, state: T_State):
     message = event.get_message()
     content = message.extract_plain_text().strip()
 
-    if re.match(r"/rollback\s+\d+", content):
+    if re.match(r"^\s*/rollback\s+\d+\s*$", content):
         n = int(content.split()[1])
         dialog_manager.rollback_dialog(user_id, n)
         logger.info(f"回滚与{user_id}的对话{n}条")
@@ -134,7 +134,7 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
         await chat_matcher.send("Error: 回复超时，请重试", at_sender=True)
     else:
         response["content"] = response["content"].strip()
-        logger.info(f"[回复]：{response}")
+        logger.info(f"[回复]：{response['content']}")
         dialog_manager.add_content(user_id, **response)
         await chat_matcher.send(response["content"], at_sender=True)
 
