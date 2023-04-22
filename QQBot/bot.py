@@ -12,6 +12,7 @@ from dialog_manager import DialogManager
 from utils import cooldown_checker, create_matcher
 
 logger.add("bot.log")
+logger.level("INFO")
 
 nonebot.init(host="127.0.0.1", port=8080)
 nonebot.load_from_toml("pyproject.toml")

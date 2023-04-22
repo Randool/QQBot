@@ -1,14 +1,16 @@
 Dialog history:
-"""
+```
 {{dialog_history}}
-"""
+```
 
 External Knowledge:
-"""
+```
 {{knowledge}}
-"""
+```
 
 Instructions:
-Give a concise but understandable response, based on the dialog history and external knowledge.
-If no outside knowledge is present, inform the user of the lack of relevant knowledge and then offer your assumption.
+Provide a concise but understandable response based on the dialogue history and external knowledge.
+If direct information is unavailable, offer related examples or topics to provide information relevant to the user's question.
 Your response language MUST match that of the user.
+
+Reply:

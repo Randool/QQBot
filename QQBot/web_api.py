@@ -75,7 +75,7 @@ class WolframAPI(MetaAPI):
     def call(query: str, wolfram_appid: str, num_results: int = 5, **kwargs) -> List[str]:
         client = wolframalpha.Client(app_id=wolfram_appid)
         response = client.query(query)
-        print(response)
+        # print(response)
         results = []
 
         if response["@success"]:

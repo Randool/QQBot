@@ -6,10 +6,12 @@
 @Version     :  1.0
 @Description :  None
 """
+import concurrent.futures
 import json
+import multiprocessing
 import re
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import openai
 import tiktoken
@@ -112,18 +114,40 @@ class ChatGPT:
     @staticmethod
     def _call_plugin_apis(plugin_APIs: List[dict], secret_keys: dict = None) -> List[str]:
         search_results: List[str] = []
+        queries: List[Tuple[str, str]] = []
 
-        # TODO: 并发调用API
         for API in plugin_APIs:
             try:
                 plugin_name, query = API["API"], API["query"]
-                results = query_web_api(plugin_name, query, **({} if secret_keys is None else secret_keys))
             except KeyError:
-                logger.warning(f"Incomplete API: {API}")
+                logger.warning(f"不完整的API：{API}")
                 continue
             else:
+                logger.info(f"完整API：{API}")
+                queries.append((plugin_name, query))
+
+        # 并发调用API
+        with concurrent.futures.ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+            futures = [executor.submit(query_web_api, *args, **secret_keys) for args in queries]
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                results = future.result()
                 search_results.extend(results)
-                logger.info(f"[{plugin_name}] {results}")
+                logger.info(f"API成功返回：{results}")
+            except Exception as e:
+                logger.error(f"执行出错: {e}")
+
+        # for API in plugin_APIs:
+        #     try:
+        #         plugin_name, query = API["API"], API["query"]
+        #         results = query_web_api(plugin_name, query, **({} if secret_keys is None else secret_keys))
+        #     except KeyError:
+        #         logger.warning(f"Incomplete API: {API}")
+        #         continue
+        #     else:
+        #         search_results.extend(results)
+        #         logger.info(f"[{plugin_name}] {results}")
 
         return search_results
 
@@ -133,7 +157,7 @@ class ChatGPT:
             timeout=20, timeout_retry=2, secret_keys: dict = None,
     ) -> Optional[dict]:
         """ Enable the large model to access external knowledge and tools. """
-        logger.info("[interact_chatgpt_with_plugins called]")
+        logger.info("`interact_chatgpt_with_plugins`被调用")
 
         ### 0x00: Summarize the dialog
         summarized_dialog = ChatGPT._summarize_dialog(messages)
