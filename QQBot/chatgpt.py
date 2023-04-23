@@ -7,6 +7,7 @@
 @Description :  None
 """
 import concurrent.futures
+import datetime
 import json
 import multiprocessing
 import re
@@ -161,11 +162,13 @@ class ChatGPT:
 
         ### 0x00: Summarize the dialog
         summarized_dialog = ChatGPT._summarize_dialog(messages)
+        date_and_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
         ### 0x01: Generate plugin calls
         with open("personality/plugin/2_generate_plugin_calls.txt", encoding="utf8") as f:
             plugin_prompt = f.read()
             plugin_prompt = plugin_prompt.replace("{{dialog_history}}", summarized_dialog)
+            plugin_prompt = plugin_prompt.replace("{{date_and_time}}", date_and_time)
 
         response = ChatGPT._auto_retry_completion(
             completion_args={"messages": [{"role": "user", "content": plugin_prompt}], **vars(chat_completion_args)},
@@ -194,6 +197,7 @@ class ChatGPT:
             reply_prompt = f.read()
             reply_prompt = reply_prompt.replace("{{dialog_history}}", summarized_dialog)
             reply_prompt = reply_prompt.replace("{{knowledge}}", "\n".join(search_results))
+            reply_prompt = reply_prompt.replace("{{date_and_time}}", date_and_time)
 
         response2 = ChatGPT._auto_retry_completion(
             completion_args={"messages": [{"role": "user", "content": reply_prompt}], **vars(chat_completion_args)},

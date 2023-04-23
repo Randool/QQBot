@@ -5,6 +5,8 @@ For Wolfram, use mathematical problems.
 For Google API, use complete questions in the same language as the query.
 Sort the output JSON by query relevance and importance, with the most relevant at the top.
 
+Current date and time: {{date_and_time}}
+
 Examples:
 1. History:
 user: 电视剧狂飙怎么样, 和三体比应该看哪一部?

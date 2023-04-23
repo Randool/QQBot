@@ -31,19 +31,19 @@ dialog_manager = DialogManager(
 )
 
 # Matchers
-help_matcher = create_matcher(command="help", priority=1)
-checkout_matcher = create_matcher(command="checkout", priority=1)
-refresh_matcher = create_matcher(command="reset", priority=1)
+help_matcher = create_matcher(command=["h", "help"], priority=1)
+checkout_matcher = create_matcher(command=["c", "checkout"], priority=1)
+refresh_matcher = create_matcher(command=["r", "reset"], priority=1)
 rollback_matcher = create_matcher(command="rollback", priority=1)
-status_matcher = create_matcher(command="status", priority=1)
+status_matcher = create_matcher(command=["s", "status"], priority=1)
 chat_matcher = create_matcher(command=config.dialog_command, priority=999)
 
 _HELP = """帮助：
-- /help：显示帮助文档
-- /checkout 人格：切换不同的人格模板（注意此操作将重置对话历史）。当前人格为：{}
-- /reset：重置对话历史
+- /h[elp]：显示帮助文档
+- /c[heckout] 人格：切换不同的人格模板（注意此操作将重置对话历史）。当前人格为：{}
+- /r[eset]：重置对话历史
 - /rollback n：将当前对话回滚n条
-- /status: 显示当前对话状态
+- /s[tatus]: 显示当前对话状态
 """
 
 
@@ -73,7 +73,7 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
             await rollback_matcher.send(f"人格：“{personality}”切换成功", at_sender=True)
     else:
         current_personality = dialog_manager.show_current_personality(user_id)
-        await rollback_matcher.send("指令格式错误，应当为“/checkout 人格。"
+        await rollback_matcher.send("指令格式错误，应当为“/c[heckout] 人格。"
                                     f"当前人格：{current_personality}。"
                                     f"可用人格：{available_personalities}", at_sender=True)
 

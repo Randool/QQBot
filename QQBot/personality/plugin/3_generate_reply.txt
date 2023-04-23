@@ -8,6 +8,8 @@ External Knowledge:
 {{knowledge}}
 ```
 
+Current date and time: {{date_and_time}}
+
 Instructions:
 Provide a concise but understandable response based on the dialogue history and external knowledge.
 If direct information is unavailable, offer related examples or topics to provide information relevant to the user's question.
