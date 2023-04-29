@@ -132,10 +132,7 @@ class DialogManager(defaultdict):
     def rollback_dialog(self, user_id: str, rollback_turns: int):
         current_user = self[user_id]
 
-        dialog_length = len(current_user["dialog"])
-        if rollback_turns >= dialog_length:
-            current_user["dialog"] = []
-        else:
-            current_user["dialog"] = current_user["dialog"][:(dialog_length - rollback_turns)]
+        if rollback_turns != 0:
+            current_user["dialog"] = current_user["dialog"][: - rollback_turns]
 
         self._dump_state(user_id)
