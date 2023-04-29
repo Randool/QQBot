@@ -61,7 +61,7 @@ async def _checkout_personality(event: V11_MessageEvent, state: T_State):
     content = message.extract_plain_text().strip()
     available_personalities = dialog_manager.show_available_personalities()
 
-    if re.match(r"^\s*/checkout\s+\w+\s*$", content):
+    if re.match(r"^\s*/c(heckout)*\s+\w+\s*$", content):
         _cmd, personality = content.split()
 
         if personality not in available_personalities:
