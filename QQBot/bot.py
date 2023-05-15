@@ -132,7 +132,13 @@ async def _chat_matcher(event: V11_MessageEvent, state: T_State):
     if response is None:
         logger.error("[超时]")
         dialog_manager.rollback_dialog(user_id, 1)
-        await chat_matcher.send("Error: 回复超时，请重试", at_sender=True)
+        await chat_matcher.send("[Timeout] 请稍后重试", at_sender=True)
+
+    elif "error" in response:
+        logger.error(response["error"])
+        dialog_manager.rollback_dialog(user_id, 1)
+        await chat_matcher.send(response["content"], at_sender=True)
+
     else:
         response["content"] = response["content"].strip()
         logger.info(f"[回复]：{response['content']}")

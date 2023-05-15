@@ -72,18 +72,18 @@ class ChatGPT:
 
             except openai.error.Timeout:
                 error_info = "[Timeout]，重新尝试！"
-                response = [{"role": "assistant", "content": error_info}]
+                response = [{"role": "assistant", "content": "[Timeout]", "error": error_info}]
                 logger.error(error_info)
 
             except openai.error.RateLimitError as e:
-                detail_e = re.sub(r"organization org-.*\s", "organization", str(e))
-                error_info = f"[RateLimitError], {detail_e}"
-                response = [{"role": "assistant", "content": error_info}]
+                # detail_e = re.sub(r"organization org-.*\s", "organization", str(e))
+                error_info = f"[RateLimitError], {e}"
+                response = [{"role": "assistant", "content": "[RateLimitError]", "error": error_info}]
                 logger.error(response)
 
             except openai.error.InvalidRequestError as e:
                 error_info = f"[InvalidRequestError], {e}"
-                response = [{"role": "assistant", "content": error_info}]
+                response = [{"role": "assistant", "content": "[InvalidRequestError]", "error": error_info}]
                 logger.error(response)
 
         return response  # response["choices"][0]["message"]
